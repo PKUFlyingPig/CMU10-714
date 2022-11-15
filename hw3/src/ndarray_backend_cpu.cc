@@ -276,6 +276,14 @@ void Matmul(const AlignedArray& a, const AlignedArray& b, AlignedArray* out, uin
    */
 
   /// BEGIN YOUR SOLUTION
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < p; j++) {
+      out->ptr[i * p + j] = 0;
+      for (int k = 0; k < n; k++) {
+        out->ptr[i * p + j] += a.ptr[i * n + k] * b.ptr[k * p + j];
+      }
+    }
+  }
   
   /// END YOUR SOLUTION
 }
@@ -285,10 +293,10 @@ inline void AlignedDot(const float* __restrict__ a,
                        float* __restrict__ out) {
 
   /**
-   * Multiply together two TILE x TILE matrices, and _add _the result to out (it is important to add
+   * Multiply together two TILE x TILE matrices, and _add_ the result to out (it is important to add
    * the result to the existing out, which you should not set to zero beforehand).  We are including
    * the compiler flags here that enable the compile to properly use vector operators to implement
-   * this function.  Specifically, the __restrict__ keyword indicates to the compile that a, b, and
+   * this function.  Specifically, the __restrict__ keyword indicates to the compiler that a, b, and
    * out don't have any overlapping memory (which is necessary in order for vector operations to be
    * equivalent to their non-vectorized counterparts (imagine what could happen otherwise if a, b,
    * and out had overlapping memory).  Similarly the __builtin_assume_aligned keyword tells the
@@ -306,6 +314,13 @@ inline void AlignedDot(const float* __restrict__ a,
   out = (float*)__builtin_assume_aligned(out, TILE * ELEM_SIZE);
 
   /// BEGIN YOUR SOLUTION
+  for (int i = 0; i < TILE; i++) {
+    for (int j = 0; j < TILE; j++) {
+      for (int k = 0; k < TILE; k++) {
+        out[i * TILE + j] += a[i * TILE + k] * b[k * TILE + j];
+      }
+    }
+  }
   
   /// END YOUR SOLUTION
 }
@@ -332,6 +347,16 @@ void MatmulTiled(const AlignedArray& a, const AlignedArray& b, AlignedArray* out
    *
    */
   /// BEGIN YOUR SOLUTION
+  for (int i = 0; i < m * p; i++) out->ptr[i] = 0;
+  for (int i = 0; i < m / TILE; i++) {
+    for (int j = 0; j < p / TILE; j++) {
+      for (int k = 0; k < n / TILE; k++) {
+        AlignedDot(&a.ptr[i * n * TILE + k * TILE * TILE], 
+                   &b.ptr[k * p * TILE + j * TILE * TILE], 
+                   &out->ptr[i * p * TILE + j * TILE * TILE]);
+      }
+    }
+  }
   
   /// END YOUR SOLUTION
 }
