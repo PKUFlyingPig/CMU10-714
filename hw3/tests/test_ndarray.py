@@ -257,7 +257,7 @@ getitem_params = [
     {"shape": (8, 16), "fn": lambda X: X[3:4, 3:4]},
     {"shape": (8, 16), "fn": lambda X: X[1:2, 1:3]},
     {"shape": (8, 16), "fn": lambda X: X[3:4, 1:4]},
-    {"shape": (8, 16), "fn": lambda X: X[1:4, 3:4]},
+    {"shape": (8, 16), "fn": lambda X: X[1:4:2, 3:4]},
 ]
 @pytest.mark.parametrize("params", getitem_params)
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])

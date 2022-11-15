@@ -365,7 +365,8 @@ class NDArray:
         ### BEGIN YOUR SOLUTION
         new_shape = [(sl.stop - sl.start + sl.step - 1) // sl.step for sl in idxs]
         offset = sum([sl.start * st for sl, st in zip(idxs, self._strides)])
-        return NDArray.make(new_shape, self._strides, self._device, self._handle, offset)
+        new_strides = tuple([st * sl.step for st, sl in zip(self._strides, idxs)])
+        return NDArray.make(new_shape, new_strides, self._device, self._handle, offset)
         ### END YOUR SOLUTION
 
     def __setitem__(self, idxs, other):
