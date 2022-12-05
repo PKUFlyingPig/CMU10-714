@@ -1,7 +1,9 @@
 import numpy as np
 from .autograd import Tensor
+import gzip
 import os
 import pickle
+import struct
 from typing import Iterator, Optional, List, Sized, Union, Iterable, Any
 from needle import backend_ndarray as nd
 
@@ -26,7 +28,10 @@ class RandomFlipHorizontal(Transform):
         """
         flip_img = np.random.rand() < self.p
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if flip_img:
+            return img[:, ::-1, :]
+        else:
+            return img
         ### END YOUR SOLUTION
 
 
@@ -46,7 +51,9 @@ class RandomCrop(Transform):
             low=-self.padding, high=self.padding + 1, size=2
         )
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        img_pad = np.pad(img, [(self.padding, self.padding), (self.padding, self.padding), (0, 0)], 'constant')
+        H, W, _ = img_pad.shape
+        return img_pad[self.padding + shift_x: H - self.padding + shift_x, self.padding + shift_y: W - self.padding + shift_y, :]
         ### END YOUR SOLUTION
 
 
@@ -106,13 +113,20 @@ class DataLoader:
 
     def __iter__(self):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if self.shuffle:
+            self.ordering = np.array_split(np.random.permutation(len(self.dataset)), 
+                                           range(self.batch_size, len(self.dataset), self.batch_size))
+        self.idx = -1
         ### END YOUR SOLUTION
         return self
 
     def __next__(self):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.idx += 1
+        if self.idx >= len(self.ordering):
+            raise StopIteration
+        samples = [self.dataset[i] for i in self.ordering[self.idx]]
+        return [Tensor(np.stack([samples[i][j] for i in range(len(samples))])) for j in range(len(samples[0]))]
         ### END YOUR SOLUTION
 
 
@@ -124,17 +138,40 @@ class MNISTDataset(Dataset):
         transforms: Optional[List] = None,
     ):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.transforms = transforms
+        with gzip.open(image_filename, "rb") as img_file:
+            magic_num, img_num, row, col = struct.unpack(">4i", img_file.read(16))
+            assert(magic_num == 2051)
+            tot_pixels = row * col
+            imgs = [np.array(struct.unpack(f"{tot_pixels}B",
+                                           img_file.read(tot_pixels)),
+                                           dtype=np.float32)
+                    for _ in range(img_num)]
+            X = np.vstack(imgs)
+            X -= np.min(X)
+            X /= np.max(X)
+            self.X = X
+
+        with gzip.open(label_filename, "rb") as label_file:
+            magic_num, label_num = struct.unpack(">2i", label_file.read(8))
+            assert(magic_num == 2049)
+            self.y = np.array(struct.unpack(f"{label_num}B", label_file.read()), dtype=np.uint8)
         ### END YOUR SOLUTION
 
     def __getitem__(self, index) -> object:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        imgs = self.X[index]
+        labels = self.y[index]
+        if len(imgs.shape) > 1:
+            imgs = np.vstack([self.apply_transforms(img.reshape(28, 28, 1)) for img in imgs])
+        else:
+            imgs = self.apply_transforms(imgs.reshape(28, 28, 1))
+        return (imgs, labels)
         ### END YOUR SOLUTION
 
     def __len__(self) -> int:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return self.X.shape[0]
         ### END YOUR SOLUTION
 
 
@@ -150,14 +187,34 @@ class CIFAR10Dataset(Dataset):
         Parameters:
         base_folder - cifar-10-batches-py folder filepath
         train - bool, if True load training dataset, else load test dataset
+
         Divide pixel values by 255. so that images are in 0-1 range.
+
         Attributes:
         X - numpy array of images
         y - numpy array of labels
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if train:
+            Xs, ys = [], []
+            for i in range(5):
+                X, y = self.load_data_batch(f"{base_folder}/data_batch_{i+1}")
+                Xs.append(X)
+                ys.append(y)
+            self.X = np.vstack(Xs)
+            self.y = np.vstack(y)
+        else:
+            self.X, self.y = self.load_data_batch(f"{base_folder}/test_batch")
         ### END YOUR SOLUTION
+    
+    @staticmethod
+    def load_data_batch(path):
+        with open(path, 'rb') as fo:
+            dict = pickle.load(fo, encoding='bytes')
+        print(dict.keys())
+        X = (np.array(dict[b"data"]) / 255).reshape((-1, 3, 32, 32))
+        y = np.array(dict[b"labels"])
+        return X, y
 
     def __getitem__(self, index) -> object:
         """
@@ -165,7 +222,7 @@ class CIFAR10Dataset(Dataset):
         Image should be of shape (3, 32, 32)
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return self.X[index], self.y[index]
         ### END YOUR SOLUTION
 
     def __len__(self) -> int:
@@ -173,7 +230,7 @@ class CIFAR10Dataset(Dataset):
         Returns the total number of examples in the dataset
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return self.X.shape[0]
         ### END YOUR SOLUTION
 
 
@@ -186,10 +243,6 @@ class NDArrayDataset(Dataset):
 
     def __getitem__(self, i) -> object:
         return tuple([a[i] for a in self.arrays])
-
-
-
-
 
 
 class Dictionary(object):
