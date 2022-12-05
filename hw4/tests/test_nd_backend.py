@@ -173,7 +173,9 @@ def test_stack_backward(shape, axis, l, device):
 SUMMATION_PARAMETERS = [((1, 1, 1), None),
     ((5, 3), 0),
     ((8, 3, 2), 1),
-    ((8, 3, 2), 2)
+    ((8, 3, 2), 2),
+    ((3, 2), 0),
+    ((2, 1, 2, 3), 3)
 ]
 @pytest.mark.parametrize("shape, axes", SUMMATION_PARAMETERS)
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
@@ -237,6 +239,7 @@ def test_logsumexp(shape, axes, device):
     else:
         t_axes = axes
     np.testing.assert_allclose(torch.logsumexp(A_t, dim=t_axes).numpy(), ndl.logsumexp(A, axes=axes).numpy(), atol=1e-5, rtol=1e-5)
+    backward_check(ndl.logsumexp, A, axes=axes)
 
 
 

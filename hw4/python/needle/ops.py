@@ -369,6 +369,8 @@ def relu(a):
 
 class LogSumExp(TensorOp):
     def __init__(self, axes: Optional[tuple] = None):
+        if isinstance(axes, int):
+            axes=(axes,)
         self.axes = axes
 
     def compute(self, Z):
@@ -381,9 +383,9 @@ class LogSumExp(TensorOp):
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         z = node.inputs[0]
-        max_z = z.realize_cached_data().max(self.axes, keepdims=True)
-        exp_z = exp(z - max_z)
-        sum_exp_z = summation(exp_z, self.axes)
+        max_z = Tensor(z.realize_cached_data().max(axis=self.axes, keepdims=True), device=z.device)
+        exp_z = exp(z - max_z.broadcast_to(z.shape))
+        sum_exp_z = summation(exp_z, axes=self.axes)
         grad_sum_exp_z = out_grad / sum_exp_z
         expand_shape = list(z.shape)
         axes = range(len(expand_shape)) if self.axes is None else self.axes
