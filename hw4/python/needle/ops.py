@@ -242,7 +242,7 @@ class BroadcastTo(TensorOp):
             if ori == cur:
                 shrink_dims[len(self.shape) - i - 1] = -1
         shrink_dims = tuple(filter(lambda x: x >= 0, shrink_dims))
-        return out_grad.sum(shrink_dims).reshape(ori_shape)
+        return out_grad.sum(shrink_dims).compact().reshape(ori_shape)
         ### END YOUR SOLUTION
 
 
@@ -514,12 +514,25 @@ class Dilate(TensorOp):
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        new_shape = list(a.shape) 
+        for axis in self.axes:
+            if axis >= len(a.shape):
+                continue
+            new_shape[axis] = new_shape[axis] * (self.dilation + 1)
+        new_shape = tuple(new_shape)
+        arr = a.device.full(new_shape, 0)
+        slices = [slice(0, n) for n in arr.shape]
+        for axis in self.axes:
+            if axis >= len(a.shape):
+                continue
+            slices[axis] = slice(0, arr.shape[axis], self.dilation + 1)
+        arr[tuple(slices)] = a
+        return arr
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return UnDilate(self.axes, self.dilation)(out_grad)
         ### END YOUR SOLUTION
 
 
@@ -533,12 +546,17 @@ class UnDilate(TensorOp):
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        slices = [slice(0, n) for n in a.shape]
+        for axis in self.axes:
+            if axis >= len(a.shape):
+                continue
+            slices[axis] = slice(0, a.shape[axis], self.dilation + 1)
+        return a[tuple(slices)].compact()
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return dilate(out_grad, self.axes, self.dilation)
         ### END YOUR SOLUTION
 
 
@@ -553,12 +571,40 @@ class Conv(TensorOp):
 
     def compute(self, A, B):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        A = A.pad(((0,0), (self.padding, self.padding), (self.padding, self.padding),(0,0)))
+        N, H, W, C_in = A.shape
+        K, K_, C_in_, C_out = B.shape
+        Ns, Hs, Ws, Cs = A.strides
+        assert K == K_, "Conv kernel should be a square tensor"
+        assert C_in == C_in_, "Conv kernel and input are not compatible"
+        
+        inner_dim = K * K * C_in
+        out_H, out_W = (H-K+1)//self.stride, (W-K+1)//self.stride
+        im2col = A.as_strided(shape=(N, out_H, out_W, K, K, C_in),
+                              strides=(Ns, Hs*self.stride, Ws*self.stride, Hs, Ws, Cs))\
+                              .compact()\
+                              .reshape((N*out_H*out_W, inner_dim))
+        out = im2col @ B.compact().reshape((K*K_*C_in_, C_out))
+        return out.compact().reshape((N, out_H, out_W, C_out))
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        X, W = node.inputs
+        K, _, _, _ = W.shape
+
+        if self.stride > 1:
+            out_grad = dilate(out_grad, (1, 2), self.stride - 1)
+        W_permute = transpose(flip(W, (0, 1)), (2, 3)) # K * K * C_out * C_in
+        # out_grad: # N * (H+2P-K+1) * (W+2P-K+1) * C_out
+        X_grad = conv(out_grad, W_permute, padding=K-1-self.padding)
+
+        X_permute = transpose(X, (0, 3)) # C_in * H * W * N
+        grad_permute = transpose(transpose(out_grad, (0, 1)), (1, 2)) # (H+2P-K+1) * (W+2P-K+1) * N * C_out
+        W_grad = conv(X_permute, grad_permute, padding=self.padding) # C_in * H * W * C_out
+        W_grad = transpose(transpose(W_grad, (0, 1)), (1, 2)) # H * W * C_in * C_out
+
+        return X_grad, W_grad
         ### END YOUR SOLUTION
 
 
