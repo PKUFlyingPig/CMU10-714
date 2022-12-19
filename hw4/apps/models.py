@@ -7,16 +7,33 @@ import numpy as np
 np.random.seed(0)
 
 
-class ResNet9(ndl.nn.Module):
+def ResidualBlock(in_channels, out_channels, kernel_size, stride, device=None):
+    ### BEGIN YOUR SOLUTION
+    main_path = nn.Sequential(nn.ConvBN(in_channels, out_channels, kernel_size, stride, device),
+                              nn.ConvBN(in_channels, out_channels, kernel_size, stride, device))
+    return nn.Residual(main_path)
+    ### END YOUR SOLUTION
+
+
+class ResNet9(nn.Module):
     def __init__(self, device=None, dtype="float32"):
         super().__init__()
         ### BEGIN YOUR SOLUTION ###
-        raise NotImplementedError() ###
+        self.model = nn.Sequential(nn.ConvBN(3, 16, 7, 4, device=device),
+                                   nn.ConvBN(16, 32, 3, 2, device=device),
+                                   ResidualBlock(32, 32, 3, 1, device=device),
+                                   nn.ConvBN(32, 64, 3, 2, device=device),
+                                   nn.ConvBN(64, 128, 3, 2, device=device),
+                                   ResidualBlock(128, 128, 3, 1, device=device),
+                                   nn.Flatten(),
+                                   nn.Linear(128, 128, device=device),
+                                   nn.ReLU(),
+                                   nn.Linear(128, 10, device=device))
         ### END YOUR SOLUTION
 
     def forward(self, x):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return self.model(x)
         ### END YOUR SOLUTION
 
 

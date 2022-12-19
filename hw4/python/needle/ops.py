@@ -358,13 +358,13 @@ def exp(a):
 class ReLU(TensorOp):
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        return (a >= 0) * a
+        return array_api.maximum(a, 0)
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         out = node.realize_cached_data()
-        return out_grad * Tensor(out >= 0)
+        return out_grad * Tensor(out >= 0, device=out_grad.device)
         ### END YOUR SOLUTION
 
 

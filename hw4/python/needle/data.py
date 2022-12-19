@@ -21,15 +21,15 @@ class RandomFlipHorizontal(Transform):
         """
         Horizonally flip an image, specified as n H x W x C NDArray.
         Args:
-            img: H x W x C NDArray of an image
+            img: C x H x W NDArray of an image
         Returns:
-            H x W x C ndarray corresponding to image flipped with probability self.p
+            C x H x W ndarray corresponding to image flipped with probability self.p
         Note: use the provided code to provide randomness, for easier testing
         """
         flip_img = np.random.rand() < self.p
         ### BEGIN YOUR SOLUTION
         if flip_img:
-            return img[:, ::-1, :]
+            return img[:, :, ::-1]
         else:
             return img
         ### END YOUR SOLUTION
@@ -42,18 +42,18 @@ class RandomCrop(Transform):
     def __call__(self, img):
         """Zero pad and then randomly crop an image.
         Args:
-             img: H x W x C NDArray of an image
+             img: C x H x W NDArray of an image
         Return
-            H x W x C NAArray of cliped image
+            C x H x W NAArray of cliped image
         Note: generate the image shifted by shift_x, shift_y specified below
         """
         shift_x, shift_y = np.random.randint(
             low=-self.padding, high=self.padding + 1, size=2
         )
         ### BEGIN YOUR SOLUTION
-        img_pad = np.pad(img, [(self.padding, self.padding), (self.padding, self.padding), (0, 0)], 'constant')
-        H, W, _ = img_pad.shape
-        return img_pad[self.padding + shift_x: H - self.padding + shift_x, self.padding + shift_y: W - self.padding + shift_y, :]
+        img_pad = np.pad(img, [(0, 0), (self.padding, self.padding), (self.padding, self.padding)], 'constant')
+        _, H, W = img_pad.shape
+        return img_pad[:, self.padding + shift_x: H - self.padding + shift_x, self.padding + shift_y: W - self.padding + shift_y]
         ### END YOUR SOLUTION
 
 
@@ -101,11 +101,13 @@ class DataLoader:
         dataset: Dataset,
         batch_size: Optional[int] = 1,
         shuffle: bool = False,
+        device = None
     ):
 
         self.dataset = dataset
         self.shuffle = shuffle
         self.batch_size = batch_size
+        self.device = device
         if not self.shuffle:
             self.ordering = np.array_split(
                 np.arange(len(dataset)), range(batch_size, len(dataset), batch_size)
@@ -125,8 +127,8 @@ class DataLoader:
         self.idx += 1
         if self.idx >= len(self.ordering):
             raise StopIteration
-        samples = [self.dataset[i] for i in self.ordering[self.idx]]
-        return [Tensor(np.stack([samples[i][j] for i in range(len(samples))])) for j in range(len(samples[0]))]
+        batch_indices = self.ordering[self.idx]
+        return tuple([Tensor(x, device = self.device) for x in self.dataset[batch_indices]])
         ### END YOUR SOLUTION
 
 
@@ -187,34 +189,33 @@ class CIFAR10Dataset(Dataset):
         Parameters:
         base_folder - cifar-10-batches-py folder filepath
         train - bool, if True load training dataset, else load test dataset
-
         Divide pixel values by 255. so that images are in 0-1 range.
-
         Attributes:
         X - numpy array of images
         y - numpy array of labels
         """
         ### BEGIN YOUR SOLUTION
+        import pickle
         if train:
-            Xs, ys = [], []
-            for i in range(5):
-                X, y = self.load_data_batch(f"{base_folder}/data_batch_{i+1}")
-                Xs.append(X)
-                ys.append(y)
-            self.X = np.vstack(Xs)
-            self.y = np.vstack(y)
+            data_batch_files = [f'data_batch_{i}' for i in range(1, 6)]
         else:
-            self.X, self.y = self.load_data_batch(f"{base_folder}/test_batch")
+            data_batch_files = ['test_batch']
+        X = []
+        Y = []
+        for data_batch_file in data_batch_files:
+            with open(os.path.join(base_folder, data_batch_file), 'rb') as f:
+                data_dict = pickle.load(f, encoding = 'bytes')
+                X.append(data_dict[b'data'])
+                Y.append(data_dict[b'labels'])
+        X = np.concatenate(X, axis = 0)
+        # preprocessing X.
+        X = X / 255.
+        X = X.reshape((-1, 3, 32, 32))
+        Y = np.concatenate(Y, axis = None) # Y is just 1-dimensional.
+        self.X = X
+        self.Y = Y
+        self.transforms=transforms
         ### END YOUR SOLUTION
-    
-    @staticmethod
-    def load_data_batch(path):
-        with open(path, 'rb') as fo:
-            dict = pickle.load(fo, encoding='bytes')
-        print(dict.keys())
-        X = (np.array(dict[b"data"]) / 255).reshape((-1, 3, 32, 32))
-        y = np.array(dict[b"labels"])
-        return X, y
 
     def __getitem__(self, index) -> object:
         """
@@ -222,7 +223,12 @@ class CIFAR10Dataset(Dataset):
         Image should be of shape (3, 32, 32)
         """
         ### BEGIN YOUR SOLUTION
-        return self.X[index], self.y[index]
+        if self.transforms:
+            image = np.array([self.apply_transforms(img) for img in self.X[index]])
+        else:
+            image = self.X[index]
+        label = self.Y[index]
+        return image, label
         ### END YOUR SOLUTION
 
     def __len__(self) -> int:
@@ -230,7 +236,7 @@ class CIFAR10Dataset(Dataset):
         Returns the total number of examples in the dataset
         """
         ### BEGIN YOUR SOLUTION
-        return self.X.shape[0]
+        return len(self.Y)
         ### END YOUR SOLUTION
 
 

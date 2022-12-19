@@ -152,8 +152,7 @@ class Sequential(Module):
 class SoftmaxLoss(Module):
     def forward(self, logits: Tensor, y: Tensor):
         ### BEGIN YOUR SOLUTION
-        one_hot_y = init.one_hot(logits.shape[1], y)
-        ## TODO: figure out what happens when Tensor contains a scalar
+        one_hot_y = init.one_hot(logits.shape[1], y, device=logits.device)
         return (ops.summation(ops.logsumexp(logits, (1,)) / logits.shape[0]) - ops.summation(one_hot_y * logits / logits.shape[0]))
         ### END YOUR SOLUTION
 
@@ -174,15 +173,18 @@ class BatchNorm1d(Module):
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
         if self.training:
-            batch_mean = x.sum((0,)) / x.shape[0]
-            batch_var = ((x - batch_mean.broadcast_to(x.shape))**2).sum((0,)) / x.shape[0]
+            batch_mean = (x.sum((0,)) / x.shape[0]) # (num_features, )
+            batch_mean_vec = batch_mean.reshape((1, x.shape[1])) # (1, num_features)
+            batch_var = (((x - batch_mean_vec.broadcast_to(x.shape))**2).sum((0,)) / x.shape[0]) # (num_features, )
+            batch_var_vec = batch_var.reshape((1, x.shape[1])) # (1, num_features)
             self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * batch_mean.data
             self.running_var = (1 - self.momentum) * self.running_var + self.momentum * batch_var.data
-            norm = (x - batch_mean.broadcast_to(x.shape)) / (batch_var.broadcast_to(x.shape) + self.eps)**0.5
-            return self.weight.broadcast_to(x.shape) * norm + self.bias.broadcast_to(x.shape)
+            norm = (x - batch_mean_vec.broadcast_to(x.shape)) / (batch_var_vec.broadcast_to(x.shape) + self.eps)**0.5
+            return self.weight.reshape((1, x.shape[1])).broadcast_to(x.shape) * norm \
+                 + self.bias.reshape((1, x.shape[1])).broadcast_to(x.shape)
         else:
-            norm = (x - self.running_mean.broadcast_to(x.shape)) / (self.running_var.broadcast_to(x.shape) + self.eps)**0.5
-            return self.weight.broadcast_to(x.shape) * norm + self.bias.broadcast_to(x.shape)
+            norm = (x - self.running_mean.reshape((1, x.shape[1])).broadcast_to(x.shape)) / (self.running_var.reshape((1, x.shape[1])).broadcast_to(x.shape) + self.eps)**0.5
+            return self.weight.reshape((1, x.shape[1])).broadcast_to(x.shape) * norm + self.bias.reshape((1, x.shape[1])).broadcast_to(x.shape)
         ### END YOUR SOLUTION
 
 
@@ -283,6 +285,20 @@ class Conv(Module):
         out = out.transpose((2, 3)).transpose((1, 2))
         return out
         ### END YOUR SOLUTION
+
+
+class ConvBN(Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, device=None):
+        super().__init__()
+        self.conv = Conv(in_channels, out_channels, kernel_size, stride=stride, device=device)
+        self.bn = BatchNorm2d(out_channels, device=device)
+        self.relu = ReLU()
+        
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        return x
 
 
 class RNNCell(Module):
