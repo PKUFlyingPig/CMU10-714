@@ -89,8 +89,8 @@ class Linear(Module):
         self.out_features = out_features
 
         ### BEGIN YOUR SOLUTION
-        self.weight = Parameter(init.kaiming_uniform(in_features, out_features, requires_grad=True))
-        self.bias = Parameter(init.kaiming_uniform(out_features, 1, requires_grad=True).transpose()) if bias else None
+        self.weight = Parameter(init.kaiming_uniform(in_features, out_features, shape=(in_features, out_features), requires_grad=True, device=device))
+        self.bias = Parameter(init.kaiming_uniform(out_features, 1, shape=(out_features, 1), requires_grad=True, device=device).transpose()) if bias else None
         ### END YOUR SOLUTION
 
     def forward(self, X: Tensor) -> Tensor:
@@ -121,7 +121,7 @@ class ReLU(Module):
 class Tanh(Module):
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return ops.tanh(x)
         ### END YOUR SOLUTION
 
 
@@ -165,10 +165,10 @@ class BatchNorm1d(Module):
         self.eps = eps
         self.momentum = momentum
         ### BEGIN YOUR SOLUTION
-        self.weight = Parameter(init.ones(dim, requires_grad=True))
-        self.bias = Parameter(init.zeros(dim, requires_grad=True))
-        self.running_mean = init.zeros(dim)
-        self.running_var = init.ones(dim)
+        self.weight = Parameter(init.ones(dim, requires_grad=True, device=device))
+        self.bias = Parameter(init.zeros(dim, requires_grad=True, device=device))
+        self.running_mean = init.zeros(dim, device=device)
+        self.running_var = init.ones(dim, device=device)
         ### END YOUR SOLUTION
 
     def forward(self, x: Tensor) -> Tensor:
@@ -204,8 +204,8 @@ class LayerNorm1d(Module):
         self.dim = dim
         self.eps = eps
         ### BEGIN YOUR SOLUTION
-        self.weight = Parameter(init.ones(dim, requires_grad=True))
-        self.bias = Parameter(init.zeros(dim, requires_grad=True))
+        self.weight = Parameter(init.ones(dim, requires_grad=True, device=device))
+        self.bias = Parameter(init.zeros(dim, requires_grad=True, device=device))
         ### END YOUR SOLUTION
 
     def forward(self, x: Tensor) -> Tensor:
@@ -262,12 +262,26 @@ class Conv(Module):
         self.stride = stride
 
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.padding = (kernel_size - 1) // 2
+        self.weight = Parameter(init.kaiming_uniform(in_channels*kernel_size*kernel_size,
+                                           out_channels*kernel_size*kernel_size,
+                                           shape=(kernel_size, kernel_size, in_channels, out_channels),
+                                           device=device))
+        if bias:
+            bias_bound = 1/(in_channels*kernel_size**2)**0.5
+            self.bias = Parameter(init.rand(self.out_channels, low=-bias_bound, high=bias_bound, device=device))
+        else:
+            self.bias = None
         ### END YOUR SOLUTION
 
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        nhwc_x = x.transpose((1, 2)).transpose((2, 3))
+        out = ops.conv(nhwc_x, self.weight, stride=self.stride, padding=self.padding)
+        if self.bias:
+            out += self.bias.reshape((1,1,1,self.out_channels)).broadcast_to(out.shape)
+        out = out.transpose((2, 3)).transpose((1, 2))
+        return out
         ### END YOUR SOLUTION
 
 

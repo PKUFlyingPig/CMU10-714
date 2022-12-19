@@ -242,7 +242,7 @@ class BroadcastTo(TensorOp):
             if ori == cur:
                 shrink_dims[len(self.shape) - i - 1] = -1
         shrink_dims = tuple(filter(lambda x: x >= 0, shrink_dims))
-        return out_grad.sum(shrink_dims).compact().reshape(ori_shape)
+        return out_grad.sum(shrink_dims).reshape(ori_shape)
         ### END YOUR SOLUTION
 
 
@@ -256,6 +256,11 @@ class Summation(TensorOp):
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
+        if isinstance(self.axes, (list, tuple)) and len(self.axes) > 1:
+            # multiple axes case
+            for axis in reversed(sorted(self.axes)):
+                a = a.sum(axis = axis)
+            return a
         return array_api.summation(a, axis=self.axes)
         ### END YOUR SOLUTION
 
