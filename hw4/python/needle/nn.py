@@ -594,7 +594,8 @@ class Embedding(Module):
             initialized from N(0, 1).
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.num_embeddings = num_embeddings
+        self.weight = Parameter(init.randn(num_embeddings, embedding_dim, device=device, dtype=dtype, requires_grad=True))
         ### END YOUR SOLUTION
 
     def forward(self, x: Tensor) -> Tensor:
@@ -608,5 +609,6 @@ class Embedding(Module):
         output of shape (seq_len, bs, embedding_dim)
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        x_one_hot = init.one_hot(self.num_embeddings, x, device=x.device, dtype=x.dtype)
+        return ops.stack([x @ self.weight for x in tuple(ops.split(x_one_hot, 0))], 0)
         ### END YOUR SOLUTION

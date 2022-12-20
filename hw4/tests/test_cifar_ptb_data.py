@@ -46,6 +46,27 @@ def test_cifar10_loader(batch_size, train, device):
     assert X.dtype == 'float32'
 
 
+def test_dictionary():
+    dic = ndl.data.Dictionary()
+    assert dic.add_word("a") == 0
+    assert len(dic) == 1
+    assert dic.add_word("a") == 0
+    assert dic.add_word("b") == 1
+    assert len(dic) == 2
+    assert dic.add_word("ccc") == 2
+    assert len(dic) == 3
+
+# def test_corpus():
+#     corpus = ndl.data.Corpus("data/ptb")
+#     corpus.dictionary.add_word("<eos>")
+#     assert corpus.tokenize("data/ptb/haha.txt") == [1, 2, 0, 3, 4, 2, 0, 1, 0]
+#     assert corpus.tokenize("data/ptb/haha.txt", max_lines=2) == [1, 2, 0, 3, 4, 2, 0]
+
+def test_batchify():
+    data = ndl.data.batchify(list(range(26)), 4, None, None)
+    assert data.shape == (6, 4)
+    assert np.linalg.norm(np.arange(24).reshape(6, 4) - data) < 1e-5
+
 BPTT = [3, 32]
 @pytest.mark.parametrize("batch_size", BATCH_SIZES)
 @pytest.mark.parametrize("bptt", BPTT)
