@@ -232,16 +232,24 @@ class BroadcastTo(TensorOp):
         self.shape = shape
 
     def compute(self, a):
+        if a.shape == self.shape:
+            return a
         return array_api.broadcast_to(a, self.shape).compact()
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         ori_shape = node.inputs[0].shape
+        if ori_shape == self.shape:
+            return out_grad
+
         shrink_dims = [i for i in range(len(self.shape))]
+        # iterate from the back because it could be len(ori_shape) < len(self.shape)
         for i, (ori, cur) in enumerate(zip(reversed(ori_shape), reversed(self.shape))):
             if ori == cur:
                 shrink_dims[len(self.shape) - i - 1] = -1
         shrink_dims = tuple(filter(lambda x: x >= 0, shrink_dims))
+        assert len(shrink_dims) > 0
+
         return out_grad.sum(shrink_dims).reshape(ori_shape)
         ### END YOUR SOLUTION
 
@@ -364,7 +372,7 @@ class ReLU(TensorOp):
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         out = node.realize_cached_data()
-        return out_grad * Tensor(out >= 0, device=out_grad.device)
+        return out_grad * Tensor(out > 0, device=out_grad.device)
         ### END YOUR SOLUTION
 
 
