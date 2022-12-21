@@ -55,6 +55,7 @@ class LanguageModel(nn.Module):
         ### BEGIN YOUR SOLUTION
         assert seq_model in ["rnn", "lstm"], "Unsupported sequence model. Must be rnn or lstm."
         self.output_size = output_size
+        self.hidden_size = hidden_size
         self.embed = nn.Embedding(output_size, embedding_size, device=device, dtype=dtype)
         if seq_model == "rnn":
             self.seq_model = nn.RNN(embedding_size, hidden_size, num_layers=num_layers, device=device, dtype=dtype)
@@ -80,8 +81,8 @@ class LanguageModel(nn.Module):
         seq_len, bs = x.shape
         x = self.embed(x)
         x, h = self.seq_model(x, h)
-        x = ops.stack([self.linear(xx) for xx in tuple(ops.split(x, 0))], 0)
-        return x.reshape((seq_len * bs, self.output_size)), h
+        x = self.linear(x.reshape((seq_len * bs, self.hidden_size)))
+        return x, h
         ### END YOUR SOLUTION
 
 

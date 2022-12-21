@@ -223,7 +223,10 @@ class CIFAR10Dataset(Dataset):
         Image should be of shape (3, 32, 32)
         """
         ### BEGIN YOUR SOLUTION
-        image = self.X[index]
+        if self.transforms:
+            image = np.array([self.apply_transforms(img) for img in self.X[index]])
+        else:
+            image = self.X[index]
         label = self.Y[index]
         return image, label
         ### END YOUR SOLUTION
@@ -356,7 +359,7 @@ def batchify(data, batch_size, device, dtype):
     ### END YOUR SOLUTION
 
 
-def get_batch(batches, i, bptt, device=None, dtype=None):
+def get_batch(batches, i, bptt, device=None, dtype="float32"):
     """
     get_batch subdivides the source data into chunks of length bptt.
     If source is equal to the example output of the batchify function, with
@@ -376,7 +379,13 @@ def get_batch(batches, i, bptt, device=None, dtype=None):
     target - Tensor of shape (bptt*bs,) with cached data as NDArray
     """
     ### BEGIN YOUR SOLUTION
-    X = batches[i : i + bptt, :]
-    y = batches[i + 1: i + 1 + bptt, :].flatten()
+    tot_seqlen = batches.shape[0]
+    assert i < tot_seqlen - 1
+    if i + bptt + 1 > tot_seqlen:
+        X = batches[i : -1, :]
+        y = batches[i+1 : , :].flatten()
+    else:
+        X = batches[i : i + bptt, :]
+        y = batches[i + 1: i + 1 + bptt, :].flatten()
     return Tensor(X, device=device, dtype=dtype), Tensor(y, device=device, dtype=dtype)
     ### END YOUR SOLUTION

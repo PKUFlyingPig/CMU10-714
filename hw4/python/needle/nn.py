@@ -595,6 +595,7 @@ class Embedding(Module):
         """
         ### BEGIN YOUR SOLUTION
         self.num_embeddings = num_embeddings
+        self.embedding_dim = embedding_dim
         self.weight = Parameter(init.randn(num_embeddings, embedding_dim, device=device, dtype=dtype, requires_grad=True))
         ### END YOUR SOLUTION
 
@@ -609,6 +610,7 @@ class Embedding(Module):
         output of shape (seq_len, bs, embedding_dim)
         """
         ### BEGIN YOUR SOLUTION
+        seq_len, bs = x.shape
         x_one_hot = init.one_hot(self.num_embeddings, x, device=x.device, dtype=x.dtype)
-        return ops.stack([x @ self.weight for x in tuple(ops.split(x_one_hot, 0))], 0)
+        return (x_one_hot.reshape((seq_len * bs, self.num_embeddings)) @ self.weight).reshape((seq_len, bs, self.embedding_dim))
         ### END YOUR SOLUTION
